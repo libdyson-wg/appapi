@@ -1,0 +1,458 @@
+openapi: 3.1.0
+
+info:
+  title: Community Documentation for The Dyson App API
+  version: 0.0.1
+  contact:
+    email: ben+libdyson@vez.email
+
+servers:
+  - url: https://appapi.cp.dyson.{tld}
+    description: The server hostname
+    variables:
+      tld:
+        default: com
+        enum:
+          - com
+          - cn
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      in: header
+      name: Authorization
+      scheme: Bearer
+
+  parameters:
+    UserAgent:
+      name: User-Agent
+      in: header
+      required: true
+      allowEmptyValue: false
+      schema:
+        type: string
+        default: android client
+
+    PathCountry:
+      name: country
+      description: A 2-digit country code, assumed to be ISO 3166-1 alpha-2
+      in: query
+      allowEmptyValue: false
+      schema:
+        type: string
+        maxLength: 2
+        minLength: 2
+        pattern: '[A-Z]{2}'
+        default: US
+
+    PathCulture:
+      name: culture
+      description: A locale/language, assumed to be IETF language code
+      in: query
+      allowEmptyValue: false
+      schema:
+        type: string
+        maxLength: 5
+        minLength: 5
+        pattern: '[a-z]{2}-[A-Z]{2}'
+        default: en-US
+
+  requestBodies:
+    UserStatusRequest:
+      description: A request for user status using an email address
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                description: An email address
+                type: string
+                format: email
+
+    BeginLoginRequest:
+      description: A request for starting the login process, requesting an authentication challenge
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+            properties:
+              email:
+                description: An email address
+                type: string
+                format: email
+
+    CompleteLoginRequest:
+      description: A request completing the login process, answering the authentication challenge
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - challengeId
+              - email
+              - otpCode
+              - password
+            properties:
+              challengeId:
+                type: string
+                format: uuid
+              email:
+                type: string
+                format: email
+              otpCode:
+                type: string
+              password:
+                type: string
+
+    IoTDataRequest:
+      description: A request for AWS IoT connection data for a given serial number
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - Serial
+            properties:
+              Serial:
+                description: A serial number
+                type: string
+
+  schemas:
+    UserStatus:
+      type: object
+      required:
+        - accountStatus
+        - authenticationMethod
+      properties:
+        accountStatus:
+          type: string
+          default: ACTIVE
+          enum:
+            - ACTIVE
+            - UNREGISTERED
+        authenticationMethod:
+          type: string
+          enum:
+            - EMAIL_PWD_2FA
+
+    LoginChallenge:
+      type: object
+      required:
+        - challengeId
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+
+    LoginInformation:
+      type: object
+      required:
+        - account
+        - token
+        - tokenType
+      properties:
+        account:
+          type: string
+          format: uuid
+        token:
+          type: string
+        tokenType:
+          type: string
+          enum:
+            - Bearer
+
+    Device:
+      type: object
+      required:
+        - category
+        - connectedConfiguration
+        - connectionCategory
+        - model
+        - name
+        - serialNumber
+        - type
+      properties:
+        category:
+          type: string
+          enum:     # Interpreted meanings for ambiguous terms in comments (maybe incorrect)
+            - ec    # environment cleaner (air filters etc)
+            - flrc  # floor cleaner
+            - hc    # hair care
+            - light
+            - robot
+            - wearable
+        connectedConfiguration:
+          $ref: '#/components/schemas/ConnectedConfiguration'
+        connectionCategory:
+          type: string
+          enum:             # Interpreted meanings for ambiguous terms in comments (maybe incorrect)
+            - lecAndWifi    # Bluetooth and Wi-Fi
+            - lecOnly       # Bluetooth only
+            - nonConnected
+            - wifiOnly
+        model:
+          type: string
+        name:
+          type: string
+        serialNumber:
+          type: string
+        type:
+          type: string
+        variant:
+          type: string
+
+    ConnectedConfiguration:
+      type: object
+      required:
+        - firmware
+        - mqtt
+      properties:
+        firmware:
+          $ref: '#/components/schemas/Firmware'
+        mqtt:
+          $ref: '#/components/schemas/MQTT'
+
+    Firmware:
+      type: object
+      required:
+        - autoUpdateEnabled
+        - newVersionAvailable
+        - version
+      properties:
+        autoUpdateEnabled:
+          type: boolean
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityString'
+
+    CapabilityString:
+      type: string
+      enum:
+        - AdvanceOscillationDay1
+        - Scheduling
+        - EnvironmentalData
+        - ExtendedAQ
+        - ChangeWifi
+
+    MQTT:
+      type: object
+      required:
+        - localBrokerCredentials
+        - mqttRootTopicLevel
+        - remoteBrokerType
+      properties:
+        localBrokerCredentials:
+          type: string
+        mqttRootTopicLevel:
+          type: string
+        remoteBrokerType:
+          type: string
+          enum:
+            - wss
+
+    IoTData:
+      type: object
+      required:
+        - Endpoint
+        - IoTCredentials
+      properties:
+        Endpoint:
+          type: string
+          format: hostname
+        IoTCredentials:
+          $ref: '#/components/schemas/IoTCredentials'
+
+    IoTCredentials:
+      type: object
+      required:
+        - ClientId
+        - CustomAuthorizerName
+        - TokenKey
+        - TokenSignature
+        - TokenValue
+      properties:
+        ClientId:
+          type: string
+          format: uuid
+        CustomAuthorizerName:
+          type: string
+        TokenKey:
+          type: string
+        TokenSignature:
+          type: string
+        TokenValue:
+          type: string
+          format: uuid
+
+  responses:
+    TooManyRequestsResponse:
+      description: A response sent by the Dyson server after too many requests. The body is always assumed to be empty.
+      content:
+        text/html: {}
+
+    UnsupportedMediaTypeResponse:
+      description: >
+        A response sent by the Dyson server for requests if an unexpected or missing `Content-Type` header is sent. The
+        body is always assumed to be empty.
+      content:
+        text/html: {}
+
+    UnauthorizedResponse:
+      description: A response sent by the Dyson server when unauthorized. The body is always assumed to be empty.
+      content:
+        text/html: {}
+
+    ProvisionResponse:
+      description: >
+        A response with a version number. Its purpose is unclear, but it's believed to be used to help keep the mobile 
+        app version up-to-date.
+      content:
+        application/json:
+          schema:
+            type: string
+
+    UserStatusResponse:
+      description: A description of a user's status on the Dyson cloud
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+
+    LoginChallengeResponse:
+      description: >
+        A response to the `beginLogin` request, containing a challenge ID to use in the `completeLogin` request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginChallenge'
+
+    LoginCompleteResponse:
+      description: A response to the `completeLogin` request, containing the account ID and login token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LoginInformation'
+
+    GetDevicesResponse:
+      description: A list of all devices on the associated account.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Device'
+
+    IoTDataResponse:
+      description: The AWS IoT connection information for a device
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/IoTData'
+
+
+paths:
+  /v1/provisioningservice/application/Android/version:
+    get:
+      operationId: provision
+      summary: provision
+      description: >
+        Gets some version info. The response doesn't matter. But making this request does matter: The server will ignore
+        all other requests from clients which haven't made this request recently.
+      responses:
+        200:
+          $ref: '#/components/responses/ProvisionResponse'
+
+  /v3/userregistration/email/userstatus:
+    post:
+      operationId: getUserStatus
+      summary: getUserStatus
+      description: Gets the status of a given user by providing their email address.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
+        - $ref: '#/components/parameters/PathCountry'
+      requestBody:
+        $ref: '#/components/requestBodies/UserStatusRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/UserStatusResponse'
+        415:
+          $ref: '#/components/responses/UnsupportedMediaTypeResponse'
+        429:
+          $ref: '#/components/responses/TooManyRequestsResponse'
+
+  /v3/userregistration/email/auth:
+    post:
+      operationId: beginLogin
+      summary: beginLogin
+      description: Begins the login process by requesting a challenge ID.
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
+        - $ref: '#/components/parameters/PathCountry'
+        - $ref: '#/components/parameters/PathCulture'
+      requestBody:
+        $ref: '#/components/requestBodies/BeginLoginRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/LoginChallengeResponse'
+        415:
+          $ref: '#/components/responses/UnsupportedMediaTypeResponse'
+        429:
+          $ref: '#/components/responses/TooManyRequestsResponse'
+
+  /v3/userregistration/email/verify:
+    post:
+      operationId: completeLogin
+      summary: completeLogin
+      description: Finishes the login process by responding to the authentication challenge
+      parameters:
+        - $ref: '#/components/parameters/UserAgent'
+        - $ref: '#/components/parameters/PathCountry'
+        - $ref: '#/components/parameters/PathCulture'
+      requestBody:
+        $ref: '#/components/requestBodies/CompleteLoginRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/LoginCompleteResponse'
+        401:
+          $ref: '#/components/responses/UnauthorizedResponse'
+        415:
+          $ref: '#/components/responses/UnsupportedMediaTypeResponse'
+        429:
+          $ref: '#/components/responses/TooManyRequestsResponse'
+
+  /v3/manifest:
+    get:
+      operationId: getDevices
+      summary: getDevices
+      description: Returns a manifest of all devices on this account and their relevant data
+      security:
+        - bearer: []
+      responses:
+        200:
+          $ref: '#/components/responses/GetDevicesResponse'
+        401:
+          $ref: '#/components/responses/UnauthorizedResponse'
+
+  /v2/authorize/iot-credentials:
+    post:
+      operationId: getIoTInfo
+      summary: getIoTInfo
+      description: Returns the AWS IoT connection information for a given device serial number
+      security:
+        - bearer: []
+      requestBody:
+        $ref: '#/components/requestBodies/IoTDataRequest'
+      responses:
+        200:
+          $ref: '#/components/responses/IoTDataResponse'
+        401:
+          $ref: '#/components/responses/UnauthorizedResponse'
+        415:
+          $ref: '#/components/responses/UnsupportedMediaTypeResponse'
