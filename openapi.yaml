@@ -227,10 +227,14 @@ components:
       properties:
         autoUpdateEnabled:
           type: boolean
+        newVersionAvailable:
+          type: boolean
         capabilities:
           type: array
           items:
             $ref: '#/components/schemas/CapabilityString'
+        version:
+          type: string
 
     CapabilityString:
       type: string
