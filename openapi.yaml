@@ -171,7 +171,6 @@ components:
       type: object
       required:
         - category
-        - connectedConfiguration
         - connectionCategory
         - model
         - name
